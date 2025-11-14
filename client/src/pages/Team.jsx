@@ -1,207 +1,187 @@
 import { useEffect, useState } from "react";
-import { UsersIcon, Search, UserPlus, Shield, Activity } from "lucide-react";
+import { useOrganization } from "@clerk/clerk-react";
+import { Search, UserPlus, Users, Activity, Shield } from "lucide-react";
 import InviteMemberDialog from "../components/InviteMemberDialog";
-import { useSelector } from "react-redux";
 
 const Team = () => {
+  const { organization } = useOrganization();
+  const [members, setMembers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-    const [tasks, setTasks] = useState([]);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [users, setUsers] = useState([]);
-    const currentWorkspace = useSelector((state) => state?.workspace?.currentWorkspace || null);
-    const projects = currentWorkspace?.projects || [];
+  // 🔄 Fetch organization members
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!organization) return;
+      try {
+        setIsLoading(true);
+        const response = await organization.getMemberships();
+        setMembers(response?.data || []);
+      } catch (error) {
+        console.error("Error fetching members:", error);
+        setMembers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-    const filteredUsers = users.filter(
-        (user) =>
-            user?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user?.user?.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    fetchMembers();
+  }, [organization]);
 
-    useEffect(() => {
-        setUsers(currentWorkspace?.members || []);
-        setTasks(currentWorkspace?.projects?.reduce((acc, project) => [...acc, ...project.tasks], []) || []);
-    }, [currentWorkspace]);
+  // 🔁 Refresh after inviting new member
+  const handleInviteSuccess = async () => {
+    if (!organization) return;
+    const updatedMembers = await organization.getMemberships();
+    setMembers(updatedMembers?.data || []);
+  };
 
-    return (
-        <div className="space-y-6 max-w-6xl mx-auto">
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-1">Team</h1>
-                    <p className="text-gray-500 dark:text-zinc-400 text-sm">
-                        Manage team members and their contributions
-                    </p>
-                </div>
-                <button onClick={() => setIsDialogOpen(true)} className="flex items-center px-5 py-2 rounded text-sm bg-gradient-to-br from-blue-500 to-blue-600 hover:opacity-90 text-white transition" >
-                    <UserPlus className="w-4 h-4 mr-2" /> Invite Member
-                </button>
-                <InviteMemberDialog isDialogOpen={isDialogOpen} setIsDialogOpen={setIsDialogOpen} />
-            </div>
+  const filteredMembers = members.filter((member) =>
+    member.publicUserData?.firstName
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
 
-            {/* Stats Cards */}
-            <div className="flex flex-wrap gap-4">
-                {/* Total Members */}
-                <div className="max-sm:w-full dark:bg-gradient-to-br dark:from-zinc-800/70 dark:to-zinc-900/50 border border-gray-300 dark:border-zinc-800 rounded-lg p-6">
-                    <div className="flex items-center justify-between gap-8 md:gap-22">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">Total Members</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">{users.length}</p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-500/10">
-                            <UsersIcon className="size-4 text-blue-500 dark:text-blue-200" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Active Projects */}
-                <div className="max-sm:w-full dark:bg-gradient-to-br dark:from-zinc-800/70 dark:to-zinc-900/50 border border-gray-300 dark:border-zinc-800 rounded-lg p-6">
-                    <div className="flex items-center justify-between gap-8 md:gap-22">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">Active Projects</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">
-                                {projects.filter((p) => p.status !== "CANCELLED" && p.status !== "COMPLETED").length}
-                            </p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-emerald-100 dark:bg-emerald-500/10">
-                            <Activity className="size-4 text-emerald-500 dark:text-emerald-200" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Total Tasks */}
-                <div className="max-sm:w-full dark:bg-gradient-to-br dark:from-zinc-800/70 dark:to-zinc-900/50 border border-gray-300 dark:border-zinc-800 rounded-lg p-6">
-                    <div className="flex items-center justify-between gap-8 md:gap-22">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-zinc-400">Total Tasks</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">{tasks.length}</p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-500/10">
-                            <Shield className="size-4 text-purple-500 dark:text-purple-200" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Search */}
-            <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-zinc-400 size-3" />
-                <input placeholder="Search team members..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-full text-sm rounded-md border border-gray-300 dark:border-zinc-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-400 py-2 focus:outline-none focus:border-blue-500" />
-            </div>
-
-            {/* Team Members */}
-            <div className="w-full">
-                {filteredUsers.length === 0 ? (
-                    <div className="col-span-full text-center py-16">
-                        <div className="w-24 h-24 mx-auto mb-6 bg-gray-200 dark:bg-zinc-800 rounded-full flex items-center justify-center">
-                            <UsersIcon className="w-12 h-12 text-gray-400 dark:text-zinc-500" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                            {users.length === 0
-                                ? "No team members yet"
-                                : "No members match your search"}
-                        </h3>
-                        <p className="text-gray-500 dark:text-zinc-400 mb-6">
-                            {users.length === 0
-                                ? "Invite team members to start collaborating"
-                                : "Try adjusting your search term"}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="max-w-4xl w-full">
-                        {/* Desktop Table */}
-                        <div className="hidden sm:block overflow-x-auto rounded-md border border-gray-200 dark:border-zinc-800">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-zinc-800">
-                                <thead className="bg-gray-50 dark:bg-zinc-900/50">
-                                    <tr>
-                                        <th className="px-6 py-2.5 text-left font-medium text-sm">
-                                            Name
-                                        </th>
-                                        <th className="px-6 py-2.5 text-left font-medium text-sm">
-                                            Email
-                                        </th>
-                                        <th className="px-6 py-2.5 text-left font-medium text-sm">
-                                            Role
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-zinc-800">
-                                    {filteredUsers.map((user) => (
-                                        <tr
-                                            key={user.id}
-                                            className="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
-                                        >
-                                            <td className="px-6 py-2.5 whitespace-nowrap flex items-center gap-3">
-                                                <img
-                                                    src={user.user.image}
-                                                    alt={user.user.name}
-                                                    className="size-7 rounded-full bg-gray-200 dark:bg-zinc-800"
-                                                />
-                                                <span className="text-sm text-zinc-800 dark:text-white truncate">
-                                                    {user.user?.name || "Unknown User"}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-2.5 whitespace-nowrap text-sm text-gray-500 dark:text-zinc-400">
-                                                {user.user.email}
-                                            </td>
-                                            <td className="px-6 py-2.5 whitespace-nowrap">
-                                                <span
-                                                    className={`px-2 py-1 text-xs rounded-md ${user.role === "ADMIN"
-                                                            ? "bg-purple-100 dark:bg-purple-500/20 text-purple-500 dark:text-purple-400"
-                                                            : "bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300"
-                                                        }`}
-                                                >
-                                                    {user.role || "User"}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Mobile Cards */}
-                        <div className="sm:hidden space-y-3">
-                            {filteredUsers.map((user) => (
-                                <div
-                                    key={user.id}
-                                    className="p-4 border border-gray-200 dark:border-zinc-800 rounded-md bg-white dark:bg-zinc-900"
-                                >
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <img
-                                            src={user.user.image}
-                                            alt={user.user.name}
-                                            className="size-9 rounded-full bg-gray-200 dark:bg-zinc-800"
-                                        />
-                                        <div>
-                                            <p className="font-medium text-gray-900 dark:text-white">
-                                                {user.user?.name || "Unknown User"}
-                                            </p>
-                                            <p className="text-sm text-gray-500 dark:text-zinc-400">
-                                                {user.user.email}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <span
-                                            className={`px-2 py-1 text-xs rounded-md ${user.role === "ADMIN"
-                                                    ? "bg-purple-100 dark:bg-purple-500/20 text-purple-500 dark:text-purple-400"
-                                                    : "bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300"
-                                                }`}
-                                        >
-                                            {user.role || "User"}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-
+  return (
+    <div className="p-6 text-zinc-900 dark:text-zinc-200">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Team</h1>
+          <p className="text-sm text-zinc-500">
+            Manage team members and their contributions
+          </p>
         </div>
-    );
+
+        <button
+          onClick={() => setIsDialogOpen(true)}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition"
+        >
+          <UserPlus className="w-4 h-4" />
+          Invite Member
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-500">Total Members</p>
+            <h2 className="text-2xl font-semibold">{members.length}</h2>
+          </div>
+          <Users className="w-8 h-8 text-blue-500" />
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-500">Active Projects</p>
+            <h2 className="text-2xl font-semibold">2</h2>
+          </div>
+          <Activity className="w-8 h-8 text-green-500" />
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-500">Total Tasks</p>
+            <h2 className="text-2xl font-semibold">0</h2>
+          </div>
+          <Shield className="w-8 h-8 text-purple-500" />
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative mb-5">
+        <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
+        <input
+          type="text"
+          placeholder="Search team members..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-zinc-300 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-950 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+        />
+      </div>
+
+      {/* Members Table */}
+      <div className="bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300">
+            <tr>
+              <th className="py-3 px-5 text-left">Name</th>
+              <th className="py-3 px-5 text-left">Email</th>
+              <th className="py-3 px-5 text-left">Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td
+                  colSpan="3"
+                  className="py-5 text-center text-zinc-500 dark:text-zinc-400"
+                >
+                  Loading members...
+                </td>
+              </tr>
+            ) : filteredMembers.length === 0 ? (
+              <tr>
+                <td
+                  colSpan="3"
+                  className="py-5 text-center text-zinc-500 dark:text-zinc-400"
+                >
+                  No members found.
+                </td>
+              </tr>
+            ) : (
+              filteredMembers.map((member) => {
+                const email =
+                  member.publicUserData?.emailAddress ||
+                  member.publicUserData?.identifier ||
+                  "No email";
+
+                return (
+                  <tr
+                    key={member.id}
+                    className="border-t border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition"
+                  >
+                    <td className="py-3 px-5 flex items-center gap-3">
+                      <img
+                        src={member.publicUserData?.imageUrl}
+                        alt="avatar"
+                        className="w-8 h-8 rounded-full border border-zinc-300 dark:border-zinc-700"
+                      />
+                      {member.publicUserData?.firstName ||
+                        member.publicUserData?.identifier ||
+                        "Unknown"}
+                    </td>
+                    <td className="py-3 px-5 text-zinc-600 dark:text-zinc-400">
+                      {email}
+                    </td>
+                    <td className="py-3 px-5">
+                      <span
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${
+                          member.role === "org:admin"
+                            ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                            : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        }`}
+                      >
+                        {member.role === "org:admin" ? "ADMIN" : "MEMBER"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Invite Member Dialog */}
+      <InviteMemberDialog
+        isDialogOpen={isDialogOpen}
+        setIsDialogOpen={setIsDialogOpen}
+        onInviteSuccess={handleInviteSuccess}
+      />
+    </div>
+  );
 };
 
 export default Team;
